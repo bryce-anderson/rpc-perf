@@ -112,7 +112,7 @@ pub struct Parameter {
     pub value: Value,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum Value {
     Stop,
     Void,
@@ -123,7 +123,7 @@ pub enum Value {
     Int32(i32),
     Int64(i64),
     String(String),
-    Struct(Vec<Value>),
+    Struct(Vec<Parameter>),
     Map,
     Set,
     List(String, i32),
@@ -217,7 +217,7 @@ impl Workload {
                         Type::Int16 => Value::Int16(self.parameters[i].seed as i16),
                         Type::Int32 => Value::Int32(self.parameters[i].seed as i32),
                         Type::Int64 => Value::Int64(self.parameters[i].seed as i64),
-                        Type::List(ttype) => {
+                        Type::List(ref ttype) => {
                             Value::List(ttype.clone(), self.parameters[i].seed as i32)
                         }
                         Type::Stop => Value::Stop,
@@ -367,8 +367,8 @@ impl Workload {
                                 Value::String(ref v) => {
                                     thrift.payload.push(ThriftType::String(p.id, v))
                                 }
-                                Value::Struct => {
-                                    thrift.payload.push(ThriftType::Struct(p.id.unwrap()))
+                                Value::Struct(_) => {
+                                    // thrift.payload.push(ThriftType::Struct(p.id.unwrap()))
                                 }
                                 Value::List(ref ttype, length) => {
                                     thrift.payload
@@ -385,6 +385,32 @@ impl Workload {
                 }
             };
             let _ = self.queue.push(query);
+        }
+    }
+}
+
+fn thrift_tree<'a, I>(thrift: &mut ThriftRequest<'a>, params: I) where
+    I: Iterator<Item=&'a Parameter> {
+    for p in params {
+        match &p.value {
+            &Value::Stop => thrift.payload.push(ThriftType::Stop),
+            &Value::Void => thrift.payload.push(ThriftType::Void),
+            &Value::Bool(v) => thrift.payload.push(ThriftType::Bool(p.id, v)),
+            &Value::Byte(v) => thrift.payload.push(ThriftType::Byte(p.id, v)),
+            &Value::Int16(v) => thrift.payload.push(ThriftType::Int16(p.id, v)),
+            &Value::Int32(v) => thrift.payload.push(ThriftType::Int32(p.id, v)),
+            &Value::Int64(v) => thrift.payload.push(ThriftType::Int64(p.id, v)),
+            &Value::String(ref v) => {
+                thrift.payload.push(ThriftType::String(p.id, v))
+            }
+            &Value::Struct(ref params) => {
+                // thrift.payload.push(ThriftType::Struct(p.id.unwrap()))
+            }
+            &Value::List(ref ttype, length) => {
+                thrift.payload
+                      .push(ThriftType::List(p.id.unwrap(), ttype, length))
+            }
+            _ => {}
         }
     }
 }
