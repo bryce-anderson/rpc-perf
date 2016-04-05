@@ -88,7 +88,7 @@ pub enum Type {
     Int32,
     Int64,
     String,
-    Struct,
+    Struct(Vec<Type>),
     Map,
     Set,
     List(String),
@@ -123,7 +123,7 @@ pub enum Value {
     Int32(i32),
     Int64(i64),
     String(String),
-    Struct,
+    Struct(Vec<Value>),
     Map,
     Set,
     List(String, i32),
@@ -202,7 +202,7 @@ impl Workload {
                             Type::Int16 => Value::Int16(rand::random::<i16>()),
                             Type::Int32 => Value::Int32(rand::random::<i32>()),
                             Type::Int64 => Value::Int64(rand::random::<i64>()),
-                            Type::Struct => Value::Struct,
+                            //Type::Struct => Value::Struct,
                             Type::String => Value::String(random_string(self.parameters[i].size)),
                             _ => {
                                 self.values[i] = random_string(self.parameters[i].size)
@@ -213,13 +213,13 @@ impl Workload {
                     }
                 }
                 Style::Static => {
-                    self.parameters[i].value = match self.parameters[i].ptype.clone() {
+                    self.parameters[i].value = match self.parameters[i].ptype {
                         Type::Int16 => Value::Int16(self.parameters[i].seed as i16),
                         Type::Int32 => Value::Int32(self.parameters[i].seed as i32),
                         Type::Int64 => Value::Int64(self.parameters[i].seed as i64),
                         Type::List(ttype) => Value::List(ttype.clone(), self.parameters[i].seed as i32),
                         Type::Stop => Value::Stop,
-                        Type::Struct => Value::Struct,
+                        //Type::Struct => Value::Struct,
                         _ => {
                             self.values[i] = seeded_string(self.parameters[i].size,
                                                            self.parameters[i].seed)

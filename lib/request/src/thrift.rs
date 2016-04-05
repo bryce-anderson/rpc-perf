@@ -40,7 +40,7 @@ pub enum ThriftType<'a> {
     Int32(Option<i16>, i32),
     Int64(Option<i16>, i64),
     String(Option<i16>, &'a str),
-    Struct(i16),
+    Struct(i16, Vec<ThriftType<'a>>),
     Map(i16),
     Set(i16),
     List(i16, &'a str, i32), // field_id, type, length
@@ -230,86 +230,92 @@ pub fn generic(request: ThriftRequest) -> Vec<u8> {
     buffer.protocol_header();
     buffer.method_name(&request.method);
     buffer.sequence_id(request.sequence_id);
-    for item in request.payload {
-        match item {
-            ThriftType::Stop => {
-                buffer.stop();
-            }
-            ThriftType::Void => {
-                buffer.write_bytes(&[VOID]);
-            }
-            ThriftType::Bool(id, val) => {
-                if let Some(id) = id {
-                    buffer.write_bytes(&[BOOL]);
-                    buffer.write_i16(id);
-                }
-                buffer.write_bool(val);
-            }
-            ThriftType::Byte(id, val) => {
-                if let Some(id) = id {
-                    buffer.write_bytes(&[BYTE]);
-                    buffer.write_i16(id);
-                }
-                buffer.write_bytes(&[val]);
-            }
-            ThriftType::Int16(id, val) => {
-                if let Some(id) = id {
-                    buffer.write_bytes(&[I16]);
-                    buffer.write_i16(id);
-                }
-                buffer.write_i16(val);
-            }
-            ThriftType::Int32(id, val) => {
-                if let Some(id) = id {
-                    buffer.write_bytes(&[I32]);
-                    buffer.write_i16(id);
-                }
-                buffer.write_i32(val);
-            }
-            ThriftType::Int64(id, val) => {
-                if let Some(id) = id {
-                    buffer.write_bytes(&[I64]);
-                    buffer.write_i16(id);
-                }
-                buffer.write_i64(val);
-            }
-            ThriftType::String(id, val) => {
-                if let Some(id) = id {
-                    buffer.write_bytes(&[STRING]);
-                    buffer.write_i16(id);
-                }
-                buffer.write_str(&val);
-            }
-            ThriftType::Struct(id) => {
-                buffer.write_bytes(&[STRUCT]);
-                buffer.write_i16(id);
-            }
-            ThriftType::Map(id) => {
-                buffer.write_bytes(&[MAP]);
-                buffer.write_i16(id);
-            }
-            ThriftType::Set(id) => {
-                buffer.write_bytes(&[SET]);
-                buffer.write_i16(id);
-            }
-            ThriftType::List(id, ttype, len) => {
-                buffer.write_bytes(&[LIST]);
-                buffer.write_i16(id);
 
-                // TODO: this could be better
-                let byte = match &*ttype {
-                    "string" => STRING,
-                    "struct" => STRUCT,
-                    _ => {
-                        panic!("unsupported ttype for list");
+    fn generic_struct(buffer: &mut Buffer, fields: &Vec<ThriftType>) {
+        for item in fields {
+            match *item {
+                ThriftType::Stop => {
+                    buffer.stop();
+                }
+                ThriftType::Void => {
+                    buffer.write_bytes(&[VOID]);
+                }
+                ThriftType::Bool(id, val) => {
+                    if let Some(id) = id {
+                        buffer.write_bytes(&[BOOL]);
+                        buffer.write_i16(id);
                     }
-                };
-                buffer.write_bytes(&[byte]);
-                buffer.write_i32(len);
+                    buffer.write_bool(val);
+                }
+                ThriftType::Byte(id, val) => {
+                    if let Some(id) = id {
+                        buffer.write_bytes(&[BYTE]);
+                        buffer.write_i16(id);
+                    }
+                    buffer.write_bytes(&[val]);
+                }
+                ThriftType::Int16(id, val) => {
+                    if let Some(id) = id {
+                        buffer.write_bytes(&[I16]);
+                        buffer.write_i16(id);
+                    }
+                    buffer.write_i16(val);
+                }
+                ThriftType::Int32(id, val) => {
+                    if let Some(id) = id {
+                        buffer.write_bytes(&[I32]);
+                        buffer.write_i16(id);
+                    }
+                    buffer.write_i32(val);
+                }
+                ThriftType::Int64(id, val) => {
+                    if let Some(id) = id {
+                        buffer.write_bytes(&[I64]);
+                        buffer.write_i16(id);
+                    }
+                    buffer.write_i64(val);
+                }
+                ThriftType::String(id, val) => {
+                    if let Some(id) = id {
+                        buffer.write_bytes(&[STRING]);
+                        buffer.write_i16(id);
+                    }
+                    buffer.write_str(&val);
+                }
+                ThriftType::Struct(id, ref fields) => {
+                    buffer.write_bytes(&[STRUCT]);
+                    buffer.write_i16(id);
+                    generic_struct(buffer, fields);
+                }
+                ThriftType::Map(id) => {
+                    buffer.write_bytes(&[MAP]);
+                    buffer.write_i16(id);
+                }
+                ThriftType::Set(id) => {
+                    buffer.write_bytes(&[SET]);
+                    buffer.write_i16(id);
+                }
+                ThriftType::List(id, ttype, len) => {
+                    buffer.write_bytes(&[LIST]);
+                    buffer.write_i16(id);
+
+                    // TODO: this could be better
+                    let byte = match &*ttype {
+                        "string" => STRING,
+                        "struct" => STRUCT,
+                        _ => {
+                            panic!("unsupported ttype for list");
+                        }
+                    };
+                    buffer.write_bytes(&[byte]);
+                    buffer.write_i32(len);
+                }
             }
         }
+        buffer.stop();
     }
-    buffer.stop();
+
+    generic_struct(&mut buffer, &request.payload);
     buffer.frame();
     buffer.into_vec()
 }
